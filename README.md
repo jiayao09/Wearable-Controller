@@ -18,12 +18,14 @@ Equipped with an OLED to monitor current hand motion.
 
 This device is capable of controlling a robotic arm with 4 degrees of freedom (Check out my robot at https://github.com/jiayao09/RobotArm.git ) to grasp a target object. The video is as follows：
 
-- The video is still in production and it's a little  challenging to film everything with only two hands (one actual, another one to wear this device). BUT, a tiny leak about it:
+
+
+
+https://user-images.githubusercontent.com/110358483/204068545-e7c3f527-58eb-441f-b728-ce8197c82f1e.mov
 
 
 
 
-https://user-images.githubusercontent.com/110358483/185718124-648125e8-ad70-4239-81ac-905e76d62e6d.mp4
 
 
 A PDF file for detailed assembly is attached.
