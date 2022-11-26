@@ -29,10 +29,9 @@ float x, y, z;
 float pre_x, pre_y, pre_z;
 int c = 0;
 float* arr;
-int value = 0;
+int value[2];
 char control;
 const byte address[6] = "00001";
-char sendDatas;
 
 void setup() {
   Serial.begin(9600);
@@ -48,19 +47,23 @@ void setup() {
 
   // Clear the buffer
   display.clearDisplay();
-
   display.setTextSize(1);             // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE);        // Draw white text
-  //display.setCursor(0,0);             // Start at top-left corner
+  display.setTextColor(SSD1306_WHITE);        // Draw white text           // Start at top-left corner
   display.println(F("Starting calibration...")); 
   display.display();
   
+  // Setup nRF24L01
   Wire.begin();                      // Initialize comunication
   Wire.beginTransmission(MPU);       // Start communication with MPU6050 // MPU=0x68
   Wire.write(0x6B);                  // Talk to the register 6B
   Wire.write(0x00);                  // Make reset - place a 0 into the 6B register
   Wire.endTransmission(true);        //end the transmission
-
+  radio.begin();
+  radio.openWritingPipe(address);
+  radio.stopListening(); 
+  delay(100);
+  
+  // Setup MPU6050 and caculate error
   Serial.println("Found a MPU-6050 sensor");
   arr = calculate_IMU_error();
   // Print the error values on the Serial Monitor
@@ -70,30 +73,28 @@ void setup() {
   GyroErrorY = arr[3];
   GyroErrorZ = arr[4];
    
-  radio.begin();
-  radio.openWritingPipe(address);
-  radio.setPALevel(RF24_PA_MIN);
-  radio.stopListening();
-  delay(100);
+  fingerinital = analogRead(A0);
+
+  //Send Signal after initialization is completed
   display.clearDisplay();
   display.setCursor(0,0);
   display.println("Calibration complete!");
   delay(5000); 
   display.display();
   delay(500);
-  
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setRotation(0);
-  
-  fingerinital = analogRead(A0);
 }
+
+
 void loop() {
- // === Read acceleromter data === //
   display.clearDisplay();
   display.setCursor(0,0);
   delay(100);
+   // === Read Angle sensor data === //
   finger = analogRead(A0);
+  // === Read acceleromter data === //
   Wire.beginTransmission(MPU);
   Wire.write(0x3B); // Start with register 0x3B (ACCEL_XOUT_H)
   Wire.endTransmission(false);
@@ -130,13 +131,70 @@ void loop() {
   roll = gyroAngleX;
   pitch = gyroAngleY;  
 
-  display.println("Accelerometer - m/s^2");
-  display.print(GyroX, 1);
+  x = roll-pre_x;
+  y = pitch-pre_y;
+  z = yaw-pre_z;
+   
+  if(abs(x) > 10 && abs(z) < 20){
+    value[1] = map(abs(x), 10, 80, 0, 180);   // C10
+    if(x > 0){
+      control = 'u';
+    }else{
+      control = 'd';
+    }
+    value[0]= (int)control;
+    radio.write(&value, sizeof(value));
+    delay(100);
+  }
+  if(abs(y) > 10 && abs(z) < 20){  //f9
+    value[1] = map(abs(y), 10, 80, 0, 180);
+    if(y > 0){
+      control = 'f';
+    }else{
+      control = 'b';
+    }
+    value[0] = (int)control;
+    radio.write(&value, sizeof(value));
+    delay(100);    
+  }
+  
+  if(abs(z)>20){
+    value[1] = map(abs(z), 20, 70, 0, 180);
+    if(z > 0){
+      control = 'l';
+    }else{
+      control = 'r';
+    }
+    value[0] = (int)control;
+    radio.write(&value, sizeof(value));
+    delay(100);    
+  }
+  pre_x = roll;
+  pre_y = pitch;
+  pre_z = yaw;
+  
+  if (abs(fingerinital - finger) > 10){
+   value[1] = map(abs(fingerinital - finger), 5, 100, 0, 180);
+   if(fingerinital > finger){
+     control = 'c';
+     Serial.print("close");
+     Serial.println(value[1]);
+    }else if (fingerinital < finger){
+      control = 'o';
+      Serial.print("open");
+      Serial.println(value[1]);
+    }   
+   value[0] = (int)control;
+   radio.write(&value, sizeof(value));
+   delay(100);  
+  }
+  fingerinital = finger;
+  delay(100);  
+
+  display.println("Singal sent");
+  display.print(control);
   display.print(", ");
-  display.print(GyroY, 1);
-  display.print(", ");
-  display.print(GyroZ, 1);
-  display.println("");
+  display.println(value[1], 1);
 
   display.println("Gyroscope - rps");
   display.print(yaw, 1);
@@ -148,87 +206,6 @@ void loop() {
 
   display.display();
   delay(100);
-  x = roll-pre_x;
-  y = pitch-pre_y;
-  z = yaw-pre_z;
-  
-  if(abs(x) > 10 && abs(z) < 20){
-    Serial.print("x change = ");
-    Serial.println(x);
-    value = map(abs(x), 10, 80, 0, 180);   // C10
-    if(x > 0){
-      control = 'u';
-      Serial.print("up");
-      Serial.println(value);
-    }else{
-      control = 'd';
-      Serial.print("down");
-      Serial.println(value);
-    }
-    sendDatas = control;
-    radio.write(&sendDatas, sizeof(sendDatas));
-    radio.write(&value, sizeof(value));
-    delay(100);
-  }
-  if(abs(y) > 10 && abs(z) < 20){  //f9
-    Serial.print("y change = ");
-    Serial.println(y);
-    value = map(abs(y), 10, 80, 0, 180);
-    if(y > 0){
-      control = 'f';
-      Serial.print("front");
-      Serial.println(value);
-    }else{
-      control = 'b';
-      Serial.print("back");
-      Serial.println(value);
-    }
-    sendDatas = control;
-    radio.write(&sendDatas, sizeof(sendDatas));
-    radio.write(&value, sizeof(value));
-    delay(100);    
-  }
-  
-  if(abs(z)>20){
-    Serial.print("z change = ");
-    Serial.println(yaw-pre_z);
-    value = map(abs(z), 20, 70, 0, 180);
-    if(z > 0){
-      control = 'l';
-      Serial.print("Left");
-      Serial.println(value);
-    }else{
-      control = 'r';
-      Serial.print("right");
-      Serial.println(value);
-    }
-    sendDatas = control;
-    radio.write(&sendDatas, sizeof(sendDatas));
-    radio.write(&value, sizeof(value));
-    delay(100);    
-  }
-  pre_x = roll;
-  pre_y = pitch;
-  pre_z = yaw;
-  
-  if (abs(fingerinital - finger) > 10){
-   value = map(abs(fingerinital - finger), 5, 100, 0, 180);
-   if(fingerinital > finger){
-     control = 'c';
-     Serial.print("close");
-     Serial.println(value);
-    }else if (fingerinital < finger){
-      control = 'o';
-      Serial.print("open");
-      Serial.println(value);
-    }   
-   sendDatas = control;
-   radio.write(&sendDatas, sizeof(sendDatas));
-   radio.write(&value, sizeof(value));
-   delay(100);  
-  }
-  fingerinital = finger;
-  delay(100);  
 }
 
 
@@ -283,7 +260,7 @@ float* calculate_IMU_error() {
   arr[3] = GyroErrorY;
   arr[4] = GyroErrorZ;
 
-    // Print the error values on the Serial Monitor
+ // Print the error values on the Serial Monitor
   Serial.print("AccErrorX: ");
   Serial.println(AccErrorX);
   Serial.print("AccErrorY: ");
