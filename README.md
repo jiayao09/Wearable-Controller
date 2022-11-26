@@ -25,7 +25,7 @@ Hardware:
 - IMPORTANT: I have used a 3D printer (Ultimaker (FFF)) for all my parts, which has a tolerance of 0.3mm. Remember to change the hole size for a more precise printer.
 
 Sensor and control board:
-- Robot arm (chech out detail here: )
+- Robot arm (chech out detail here: https://github.com/jiayao09/RobotArm.git)
 - Controller:
    - Arduino nano
    - OLED I2C Module
